@@ -1,4 +1,3 @@
-// Yeah! That's the fucked java!!
 package com.gruebleen.game;
 
 import com.badlogic.gdx.ApplicationAdapter;
