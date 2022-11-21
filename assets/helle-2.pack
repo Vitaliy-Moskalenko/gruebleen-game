@@ -1,0 +1,41 @@
+
+helle.png
+size: 2048, 512
+format: RGBA8888
+filter: Nearest, Nearest
+repeat: none
+background
+  rotate: false
+  xy: 2, 2
+  size: 800, 480
+  orig: 800, 480
+  offset: 0, 0
+  index: -1
+ground2
+  rotate: false
+  xy: 804, 291
+  size: 800, 70
+  orig: 800, 70
+  offset: 0, 0
+  index: -1
+helli
+  rotate: false
+  xy: 1722, 177
+  size: 290, 305
+  orig: 290, 305
+  offset: 0, 0
+  index: -1
+soldiers
+  rotate: false
+  xy: 804, 223
+  size: 601, 66
+  orig: 601, 66
+  offset: 0, 0
+  index: -1
+tank
+  rotate: false
+  xy: 804, 363
+  size: 916, 119
+  orig: 916, 119
+  offset: 0, 0
+  index: -1
