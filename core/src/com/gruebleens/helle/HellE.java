@@ -27,22 +27,30 @@ public class HellE extends ApplicationAdapter {
 	
 	private static final Boolean debug = true;
 
-	private static final float   TAP_DRAW_TIME_MAX = 1.0f;
+	static final int WND_WIDTH       = 800;
+	static final int WND_HEIGHT      = 480;
+	static final int WND_HALF_WIDTH  = 400;
+	static final int WND_HALF_HEIGHT = 240;
+
+	static final int GAME_INIT   = 0;
+	static final int GAME_ACTION = 1;
+	static final int GAME_OVER   = 2;	
+
 	private static final int     TOUCH_IMPULSE = 500; 
+	private static final float   TAP_DRAW_TIME_MAX = 1.0f;
 	private static final Vector2 DAMPING = new Vector2(0.99f, 0.99f);
 
+	int   gameState = GAME_INIT;
+	float deltaPosition;
 	float terrainOffset;
 	float planeAnimationTime;
-
-
-	Texture gameOver;
-
+	
 	TextureRegion bgRegion;
+	TextureRegion gameOver;
 	TextureRegion terrainAbove;
 	TextureRegion terrainBelow;
 
 	float tapDrawTime;
-	TextureRegion tapIndicator;
 	TextureRegion tap1;
 	TextureRegion tap2;
 	TextureRegion pillarUp;
@@ -66,7 +74,6 @@ public class HellE extends ApplicationAdapter {
 	OrthographicCamera camera;
 	Viewport           viewport;
 	FPSLogger          fpsLogger;
-
 	
 	@Override
 	public void create () {
@@ -74,8 +81,8 @@ public class HellE extends ApplicationAdapter {
 		batch     = new SpriteBatch();
 		camera    = new OrthographicCamera();
 		// camera.setToOrtho(false, 800, 480);
-		camera.position.set(400, 240, 0);
-		viewport = new FitViewport(800, 480, camera);
+		camera.position.set(WND_HALF_WIDTH, WND_HALF_HEIGHT, 0);
+		viewport = new FitViewport(WND_WIDTH, WND_HEIGHT, camera);
 
 		atlas = new TextureAtlas(Gdx.files.internal("packerout/helle.pack"));
 
@@ -83,6 +90,7 @@ public class HellE extends ApplicationAdapter {
 		terrainBelow = atlas.findRegion("ground2");
 		terrainAbove = new TextureRegion(terrainBelow);
 		terrainAbove.flip(true, true);
+		gameOver     = atlas.findRegion("gameover");
 
 		plane = new Animation(0.05f,
 			atlas.findRegion("helli1"),
@@ -92,7 +100,8 @@ public class HellE extends ApplicationAdapter {
 		); 
 		plane.setPlayMode(PlayMode.LOOP);
 
-		tapIndicator = atlas.findRegion("tap2");
+		tap1 = atlas.findRegion("tap1");
+		tap2 = atlas.findRegion("tap2");
 
 		_resetScene();
 	}
@@ -110,12 +119,14 @@ public class HellE extends ApplicationAdapter {
 
 	private void _resetScene() {
 		tapDrawTime   = 0;
+
 		terrainOffset = 0;
-	
-		planeAnimationTime = 0;
-		planeVelocity.set(100, 0);
 		gravity.set(0, -2);
-		planeDefaultPosition.set(200 - 44, 240 - 73 / 2);
+		scrollVelocity.set(5, 0);
+
+		planeAnimationTime = 0;
+		planeVelocity.set(100, 0);		
+		planeDefaultPosition.set(200 - 44, WND_HALF_HEIGHT - 73 / 2);
 		planePosition.set(planeDefaultPosition.x, planeDefaultPosition.y);
 	
 		// pillars.clear();
@@ -123,32 +134,42 @@ public class HellE extends ApplicationAdapter {
 	}
 
 	private void _updateScene() {
+		if(Gdx.input.justTouched()) {
+			if(gameState == GAME_INIT) { gameState = GAME_ACTION; return; }
+			if(gameState == GAME_OVER) {
+				gameState = GAME_INIT;
+				_resetScene();
+				return;
+			}
+
+			touchPosition.set(Gdx.input.getX(), Gdx.input.getY(), 0);
+			camera.unproject(touchPosition);
+			tmp.set(planePosition.x, planePosition.y);
+			tmp.add(touchPosition.x, touchPosition.y).nor(); // sub
+			planeVelocity.mulAdd(tmp,
+				TOUCH_IMPULSE - MathUtils.clamp(
+					Vector2.dst(touchPosition.x,
+							    touchPosition.y,
+								planePosition.x,
+								planePosition.y),
+				0,
+			    TOUCH_IMPULSE)
+			);
+			tapDrawTime = TAP_DRAW_TIME_MAX;
+		}
+
+		if(gameState == GAME_INIT || gameState == GAME_OVER) return;
+
 		float dT = Gdx.graphics.getDeltaTime();
 
 		planeAnimationTime += dT;
 		planeVelocity.scl(DAMPING);
 		planeVelocity.add(gravity);
-		planePosition.mulAdd(planeVelocity, dT);		
+		planeVelocity.add(scrollVelocity);
+		planePosition.mulAdd(planeVelocity, dT);
 
-		if(Gdx.input.justTouched()) {
-			touchPosition.set(Gdx.input.getX(), Gdx.input.getY(), 0);
-			camera.unproject(touchPosition);
-
-			tmp.set(planePosition.x, planePosition.y);
-			tmp.sub(touchPosition.x, touchPosition.y).nor();
-			planeVelocity.mulAdd(
-				tmp,
-				TOUCH_IMPULSE - MathUtils.clamp(Vector2.dst(touchPosition.x,
-											 			    touchPosition.y,
-											  				planePosition.x,
-											  				planePosition.y),
-															0,
-														    TOUCH_IMPULSE)
-			);
-			tapDrawTime = TAP_DRAW_TIME_MAX;
-		}
-
-		terrainOffset -= planePosition.x - planeDefaultPosition.x;
+		deltaPosition = planePosition.x - planeDefaultPosition.x;
+		terrainOffset -= deltaPosition;
 		planePosition.x = planeDefaultPosition.x;
 
 		if(terrainOffset * -1 > terrainBelow.getRegionWidth())
@@ -157,15 +178,18 @@ public class HellE extends ApplicationAdapter {
 		if(terrainOffset > 0)
 			terrainOffset = -terrainBelow.getRegionWidth();
 
+		if(planePosition.y < terrainBelow.getRegionHeight() - 60 ||
+		   planePosition.y + 65 > WND_HEIGHT - terrainAbove.getRegionHeight() + 35)
+			if(gameState != GAME_OVER) 
+				gameState = GAME_OVER;		     
+
 		tapDrawTime -= dT;
 
 	}
 
 	private void _drawScene() {
 		camera.update();
-
 		batch.setProjectionMatrix(camera.combined);
-
 		batch.begin();
 
 		batch.disableBlending();
@@ -174,11 +198,17 @@ public class HellE extends ApplicationAdapter {
 		batch.enableBlending();
 		batch.draw(terrainBelow, terrainOffset, 0);
 		batch.draw(terrainBelow, terrainOffset + terrainBelow.getRegionWidth(), 0);
-		batch.draw(terrainAbove, terrainOffset, 480 - terrainAbove.getRegionHeight());
-		batch.draw(terrainAbove, terrainOffset + terrainAbove.getRegionWidth(), 480 - terrainAbove.getRegionHeight());
+		batch.draw(terrainAbove, terrainOffset, WND_HEIGHT - terrainAbove.getRegionHeight());
+		batch.draw(terrainAbove, terrainOffset + terrainAbove.getRegionWidth(), WND_HEIGHT - terrainAbove.getRegionHeight());
 
-		if(tapDrawTime > 0)
-			batch.draw(tapIndicator, touchPosition.x - 29.5f, touchPosition.y - 29.5f); 
+		if(tapDrawTime > 0) // 29.5 - is a half width/height of image
+			batch.draw(tap2, touchPosition.x - 29.5f, touchPosition.y - 29.5f);
+
+		if(gameState == GAME_INIT)
+			batch.draw(tap1, planePosition.x, planePosition.y - 80);
+
+		if(gameState == GAME_OVER)
+			batch.draw(gameOver, WND_HALF_WIDTH - 200, WND_HALF_HEIGHT - 10);	
 
 		batch.draw(plane.getKeyFrame(planeAnimationTime), planePosition.x, planePosition.y);
 
@@ -186,8 +216,8 @@ public class HellE extends ApplicationAdapter {
 	}
 	
 	@Override
-	public void resize(int widht, int height) {
-		viewport.update(widht, height);
+	public void resize(int width, int height) {
+		viewport.update(width, height);
 	}
 
 	@Override
