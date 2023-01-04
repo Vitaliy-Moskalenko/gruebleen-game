@@ -61,6 +61,11 @@ public class HellE extends ApplicationAdapter {
 	TextureAtlas atlas;
 
 	Animation<TextureRegion> plane;
+	Array<Vector2> pillars = new Array<Vector2>();
+	Vector2 lastPillarPosition   = new Vector2();
+
+	Rectangle obstacleRect = new Rectangle();
+	Rectangle planeRect    = new Rectangle();
 
 	Vector2 gravity              = new Vector2();
 	Vector2 planeVelocity        = new Vector2();
@@ -102,6 +107,8 @@ public class HellE extends ApplicationAdapter {
 
 		tap1 = atlas.findRegion("tap1");
 		tap2 = atlas.findRegion("tap2");
+		pillarUp   = atlas.findRegion("tower-up");
+		pillarDown = atlas.findRegion("ice-tower-down");
 
 		_resetScene();
 	}
@@ -122,15 +129,15 @@ public class HellE extends ApplicationAdapter {
 
 		terrainOffset = 0;
 		gravity.set(0, -2);
-		scrollVelocity.set(5, 0);
+		scrollVelocity.set(4, 0);
 
 		planeAnimationTime = 0;
 		planeVelocity.set(100, 0);		
 		planeDefaultPosition.set(200 - 44, WND_HALF_HEIGHT - 73 / 2);
 		planePosition.set(planeDefaultPosition.x, planeDefaultPosition.y);
 	
-		// pillars.clear();
-		// addPillar();
+		pillars.clear();
+		_addPillar();
 	}
 
 	private void _updateScene() {
@@ -171,12 +178,33 @@ public class HellE extends ApplicationAdapter {
 		deltaPosition = planePosition.x - planeDefaultPosition.x;
 		terrainOffset -= deltaPosition;
 		planePosition.x = planeDefaultPosition.x;
+		planeRect.set(planePosition.x, planePosition.y, 160, 45);
 
 		if(terrainOffset * -1 > terrainBelow.getRegionWidth())
 			terrainOffset = 0;
 
 		if(terrainOffset > 0)
 			terrainOffset = -terrainBelow.getRegionWidth();
+
+		// Pillars
+		for(Vector2 vec: pillars) {
+			vec.x -= deltaPosition;
+			if(vec.x + pillarUp.getRegionWidth() < -10)
+				pillars.removeValue(vec, false);
+			if(vec.y == 1)
+				obstacleRect.set(vec.x+10, 0, pillarUp.getRegionWidth()-20, pillarUp.getRegionHeight()-10);
+			else
+				obstacleRect.set(vec.x+10, WND_HEIGHT-pillarDown.getRegionHeight()+10,
+									pillarDown.getRegionWidth()-20, pillarDown.getRegionHeight());
+
+			if(planeRect.overlaps(obstacleRect)) 
+				if(gameState != GAME_OVER)
+					gameState = GAME_OVER;
+		}
+		if(lastPillarPosition.x < 400)
+			_addPillar();
+
+
 
 		if(planePosition.y < terrainBelow.getRegionHeight() - 60 ||
 		   planePosition.y + 65 > WND_HEIGHT - terrainAbove.getRegionHeight() + 35)
@@ -201,6 +229,13 @@ public class HellE extends ApplicationAdapter {
 		batch.draw(terrainAbove, terrainOffset, WND_HEIGHT - terrainAbove.getRegionHeight());
 		batch.draw(terrainAbove, terrainOffset + terrainAbove.getRegionWidth(), WND_HEIGHT - terrainAbove.getRegionHeight());
 
+		for(Vector2 vec: pillars) {
+			if(vec.y == 1)
+				batch.draw(pillarUp, vec.x, 0, 50, 180);
+			else
+				batch.draw(pillarDown, vec.x, WND_HEIGHT - pillarDown.getRegionHeight(), 50, 180);
+		}
+
 		if(tapDrawTime > 0) // 29.5 - is a half width/height of image
 			batch.draw(tap2, touchPosition.x - 29.5f, touchPosition.y - 29.5f);
 
@@ -210,11 +245,27 @@ public class HellE extends ApplicationAdapter {
 		if(gameState == GAME_OVER)
 			batch.draw(gameOver, WND_HALF_WIDTH - 200, WND_HALF_HEIGHT - 10);	
 
-		batch.draw(plane.getKeyFrame(planeAnimationTime), planePosition.x, planePosition.y);
+		batch.draw(plane.getKeyFrame(planeAnimationTime), planePosition.x, planePosition.y, 160, 45);
 
 		batch.end();
 	}
 	
+	private void _addPillar() {
+		Vector2 pillarPosition = new Vector2();
+		
+		pillarPosition.x = (pillars.size == 0) 
+			? (float)(WND_WIDTH + Math.random() * 600) 
+			: lastPillarPosition.x + (float)(600 + Math.random() * 600);
+
+
+		pillarPosition.y = (MathUtils.randomBoolean()) ? 1 : -1;
+
+		lastPillarPosition = pillarPosition;
+		pillars.add(pillarPosition);
+
+	}
+
+
 	@Override
 	public void resize(int width, int height) {
 		viewport.update(width, height);
@@ -222,6 +273,7 @@ public class HellE extends ApplicationAdapter {
 
 	@Override
 	public void dispose () {
+		pillars.clear();
 		batch.dispose();
 		atlas.dispose();
 	}
