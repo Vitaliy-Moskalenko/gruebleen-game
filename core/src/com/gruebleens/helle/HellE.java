@@ -39,6 +39,7 @@ public class HellE extends ApplicationAdapter {
 	private static final int     TOUCH_IMPULSE = 500; 
 	private static final float   TAP_DRAW_TIME_MAX = 1.0f;
 	private static final Vector2 DAMPING = new Vector2(0.99f, 0.99f);
+	private static final int     MISSILE_SPEED = 60;
 
 	int   gameState = GAME_INIT;
 	float deltaPosition;
@@ -63,6 +64,13 @@ public class HellE extends ApplicationAdapter {
 	Animation<TextureRegion> plane;
 	Array<Vector2> pillars = new Array<Vector2>();
 	Vector2 lastPillarPosition   = new Vector2();
+
+	Array<TextureAtlas.AtlasRegion> MissileTextures = new Array<TextureAtlas.AtlasRegion>();
+	TextureRegion selectedMissileTexture;
+	boolean isMissileInScene;
+	float nextMissileIn;
+	Vector2 missilePosition = new Vector2();
+	Vector2 missileVelocity = new Vector2();
 
 	Rectangle obstacleRect = new Rectangle();
 	Rectangle planeRect    = new Rectangle();
@@ -107,8 +115,13 @@ public class HellE extends ApplicationAdapter {
 
 		tap1 = atlas.findRegion("tap1");
 		tap2 = atlas.findRegion("tap2");
+
 		pillarUp   = atlas.findRegion("tower-up");
 		pillarDown = atlas.findRegion("ice-tower-down");
+
+		MissileTextures.add(atlas.findRegion("missile-tiny"));
+		MissileTextures.add(atlas.findRegion("missile-medium"));
+		MissileTextures.add(atlas.findRegion("missile-large"));
 
 		_resetScene();
 	}
@@ -138,6 +151,9 @@ public class HellE extends ApplicationAdapter {
 	
 		pillars.clear();
 		_addPillar();
+
+		isMissileInScene = false;
+		nextMissileIn = (float)(Math.random() * MissileTextures.size);
 	}
 
 	private void _updateScene() {
@@ -197,14 +213,31 @@ public class HellE extends ApplicationAdapter {
 				obstacleRect.set(vec.x+10, WND_HEIGHT-pillarDown.getRegionHeight()+10,
 									pillarDown.getRegionWidth()-20, pillarDown.getRegionHeight());
 
-			if(planeRect.overlaps(obstacleRect)) 
+			/* if(planeRect.overlaps(obstacleRect)) 
 				if(gameState != GAME_OVER)
-					gameState = GAME_OVER;
+					gameState = GAME_OVER; */
 		}
 		if(lastPillarPosition.x < 400)
 			_addPillar();
 
+		// Missiles
+		if(isMissileInScene) {
+			missilePosition.mulAdd(missileVelocity, dT);
+			missilePosition.x -= deltaPosition;
+			if(missilePosition.x < -10)
+				isMissileInScene = false;
 
+			obstacleRect.set(missilePosition.x+2, missilePosition.y+2, 
+				selectedMissileTexture.getRegionWidth()-4, selectedMissileTexture.getRegionHeight()-4);
+
+			if(planeRect.overlaps(obstacleRect))
+				if(gameState != GAME_OVER)
+					gameState = GAME_OVER;
+		}
+
+		nextMissileIn -= dT;
+		if(nextMissileIn <= 0)
+			_launchMissile();
 
 		if(planePosition.y < terrainBelow.getRegionHeight() - 60 ||
 		   planePosition.y + 65 > WND_HEIGHT - terrainAbove.getRegionHeight() + 35)
@@ -229,12 +262,17 @@ public class HellE extends ApplicationAdapter {
 		batch.draw(terrainAbove, terrainOffset, WND_HEIGHT - terrainAbove.getRegionHeight());
 		batch.draw(terrainAbove, terrainOffset + terrainAbove.getRegionWidth(), WND_HEIGHT - terrainAbove.getRegionHeight());
 
+		// Pillars
 		for(Vector2 vec: pillars) {
 			if(vec.y == 1)
 				batch.draw(pillarUp, vec.x, 0, 50, 180);
 			else
 				batch.draw(pillarDown, vec.x, WND_HEIGHT - pillarDown.getRegionHeight(), 50, 180);
 		}
+
+		// Missiles 
+		if(isMissileInScene)
+			batch.draw(selectedMissileTexture, missilePosition.x, missilePosition.y);
 
 		if(tapDrawTime > 0) // 29.5 - is a half width/height of image
 			batch.draw(tap2, touchPosition.x - 29.5f, touchPosition.y - 29.5f);
@@ -263,6 +301,25 @@ public class HellE extends ApplicationAdapter {
 		lastPillarPosition = pillarPosition;
 		pillars.add(pillarPosition);
 
+	}
+
+	private void _launchMissile() {
+		nextMissileIn = 1.5f + (float)(Math.random() * MissileTextures.size);
+
+		if(isMissileInScene) return;
+		isMissileInScene = true;
+
+		int id = (int)(Math.random() * MissileTextures.size);
+		selectedMissileTexture = MissileTextures.get(id);
+		missilePosition.x = 810;
+		missilePosition.y = (float)(80 + Math.random() * 320);
+
+		Vector2 destination = new Vector2();
+		destination.x = -10;
+		destination.y = (float)(80 + Math.random() * 320);
+		destination.sub(missilePosition).nor();
+
+		missileVelocity.mulAdd(destination, MISSILE_SPEED);
 	}
 
 
