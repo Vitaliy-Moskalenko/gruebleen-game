@@ -87,6 +87,12 @@ public class HellE extends ApplicationAdapter {
 	OrthographicCamera camera;
 	Viewport           viewport;
 	FPSLogger          fpsLogger;
+
+	Music music;
+	Sound tapSound;
+	Sound crashSound;
+	Sound spawnSound;
+
 	
 	@Override
 	public void create () {
@@ -123,6 +129,14 @@ public class HellE extends ApplicationAdapter {
 		MissileTextures.add(atlas.findRegion("missile-medium"));
 		MissileTextures.add(atlas.findRegion("missile-large"));
 
+		music = Gdx.audio.newMusic(Gdx.files.internal("sound/journey.mp3"));
+		music.setLooping(true);
+		music.play();
+
+		tapSound   = Gdx.audio.newSound(Gdx.files.internal("sound/pop.ogg"));
+		crashSound = Gdx.audio.newSound(Gdx.files.internal("sound/crash.ogg"));
+		spawnSound = Gdx.audio.newSound(Gdx.files.internal("sound/alarm.ogg"));
+
 		_resetScene();
 	}
 
@@ -158,6 +172,8 @@ public class HellE extends ApplicationAdapter {
 
 	private void _updateScene() {
 		if(Gdx.input.justTouched()) {
+			tapSound.play();
+
 			if(gameState == GAME_INIT) { gameState = GAME_ACTION; return; }
 			if(gameState == GAME_OVER) {
 				gameState = GAME_INIT;
@@ -213,9 +229,11 @@ public class HellE extends ApplicationAdapter {
 				obstacleRect.set(vec.x+10, WND_HEIGHT-pillarDown.getRegionHeight()+10,
 									pillarDown.getRegionWidth()-20, pillarDown.getRegionHeight());
 
-			/* if(planeRect.overlaps(obstacleRect)) 
-				if(gameState != GAME_OVER)
-					gameState = GAME_OVER; */
+			if(planeRect.overlaps(obstacleRect)) 
+				if(gameState != GAME_OVER){
+					crashSound.play();
+					gameState = GAME_OVER;
+				}	 
 		}
 		if(lastPillarPosition.x < 400)
 			_addPillar();
@@ -231,8 +249,10 @@ public class HellE extends ApplicationAdapter {
 				selectedMissileTexture.getRegionWidth()-4, selectedMissileTexture.getRegionHeight()-4);
 
 			if(planeRect.overlaps(obstacleRect))
-				if(gameState != GAME_OVER)
+				if(gameState != GAME_OVER) {
+					crashSound.play();
 					gameState = GAME_OVER;
+				}	
 		}
 
 		nextMissileIn -= dT;
@@ -241,8 +261,10 @@ public class HellE extends ApplicationAdapter {
 
 		if(planePosition.y < terrainBelow.getRegionHeight() - 60 ||
 		   planePosition.y + 65 > WND_HEIGHT - terrainAbove.getRegionHeight() + 35)
-			if(gameState != GAME_OVER) 
+			if(gameState != GAME_OVER) {
+				crashSound.play();
 				gameState = GAME_OVER;		     
+			}	
 
 		tapDrawTime -= dT;
 
@@ -304,6 +326,8 @@ public class HellE extends ApplicationAdapter {
 	}
 
 	private void _launchMissile() {
+		spawnSound.play();
+
 		nextMissileIn = 1.5f + (float)(Math.random() * MissileTextures.size);
 
 		if(isMissileInScene) return;
@@ -333,5 +357,11 @@ public class HellE extends ApplicationAdapter {
 		pillars.clear();
 		batch.dispose();
 		atlas.dispose();
+		MissileTextures.clear();
+
+		tapSound.dispose();
+		crashSound.dispose();
+		spawnSound.dispose();
+		music.dispose();
 	}
 }
